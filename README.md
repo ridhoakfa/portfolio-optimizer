@@ -86,14 +86,12 @@ Korelasi Spearman dipilih (bukan Pearson) karena tidak memerlukan asumsi normali
 
 Matriks semivariance-semicovariance dihitung dengan formula Estrada (2008):
 
-```
-Sigma_sv[i,j] = (1/T) * sum_t [ min(R_i,t - B_t, 0) * min(R_j,t - B_t, 0) ]
-```
+$\Sigma_{sv}[i, j] = \frac{1}{T} \sum_{t=1}^{T} \min(R_{i,t} - B_t, 0) \cdot \min(R_{j,t} - B_t, 0)$
 
 dengan:
-- `R_i,t` = log return saham ke-i pada periode t
-- `B_t` = log return benchmark pada periode t
-- `T` = jumlah observasi
+- $R_{i,t}$ = log return saham ke-$i$ pada periode $t$
+- $B_t$ = log return benchmark pada periode $t$
+- $T$ = jumlah observasi
 
 Berbeda dengan covariance standar yang memperhitungkan semua deviasi, semivariance hanya memperhitungkan deviasi di bawah benchmark. Ini sesuai dengan perilaku investor yang menghindari risiko downside, bukan semua volatilitas.
 
@@ -105,22 +103,27 @@ Kedua strategi menggunakan SLSQP dengan kendala yang sama:
 
 **Strategi 1 — Max Sortino Ratio**
 
-```
-maximize  (w^T mu - rf) / sqrt(w^T Sigma_sv w)
-```
+$$
+\max_{w} \quad \frac{w^T \mu - r_f}{\sqrt{w^T \Sigma_{sv} w}}
+$$
 
 **Strategi 2 — Min Semivariance**
 
-```
-minimize  w^T Sigma_sv w
-```
+$$
+\min_{w} \quad w^T \Sigma_{sv} w
+$$
 
-Kedua strategi menggunakan matriks risiko `Sigma_sv` yang sama. Perbedaan hanya terletak pada fungsi tujuan.
+Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan.
 
 ### Evaluasi Kinerja
 
 - **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan
-- **Cumulative Return**: `exp(sum(log_return)) - 1`
+- **Cumulative Return**:
+  
+  $$
+  R_{\text{cum}} = \exp\left(\sum_{t=1}^{T} r_t\right) - 1
+  $$
+
 - **Value at Risk 95%**: Historical Simulation, kuantil ke-5 dari return portofolio aktual, dikonversi ke nominal rupiah dengan dana awal yang dapat dikonfigurasi
 
 ---
@@ -149,12 +152,14 @@ Atau unduh ZIP dan ekstrak ke folder lokal.
 Disarankan untuk mengisolasi dependensi proyek dari Python sistem.
 
 **Windows:**
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 ```
 
 **macOS / Linux:**
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -339,5 +344,3 @@ Proyek ini bersifat open-source. Penggunaan untuk keperluan akademik, pembelajar
 Program Studi Statistika, Universitas Diponegoro
 
 Untuk pertanyaan, saran, atau laporan bug, silakan buka issue di repositori GitHub atau hubungi langsung melalui GitHub.
-```
-
