@@ -86,16 +86,9 @@ Korelasi Spearman dipilih (bukan Pearson) karena tidak memerlukan asumsi normali
 
 Matriks semivariance-semicovariance dihitung dengan formula Estrada (2008):
 
-<<<<<<< HEAD
-$$\Sigma_{sv}[i,j] = \frac{1}{T} \sum_{t=1}^{T} \min(R_{i,t} - B_t, 0) \cdot \min(R_{j,t} - B_t, 0)$$
-
-dengan:
-
-=======
 $\Sigma_{sv}[i, j] = \frac{1}{T} \sum_{t=1}^{T} \min(R_{i,t} - B_t, 0) \cdot \min(R_{j,t} - B_t, 0)$
 
 dengan:
->>>>>>> 14152edf6c8c1653e22d6a2f1604b7cb472b784d
 - $R_{i,t}$ = log return saham ke-$i$ pada periode $t$
 - $B_t$ = log return benchmark pada periode $t$
 - $T$ = jumlah observasi
@@ -105,19 +98,11 @@ Berbeda dengan covariance standar yang memperhitungkan semua deviasi, semivarian
 ### Optimasi Portofolio
 
 Kedua strategi menggunakan SLSQP dengan kendala yang sama:
-
-- Long-only: $0 \leq w_i \leq 1$
-- Total bobot sama dengan 1: $\sum_{i=1}^{N} w_i = 1$
+- Long-only: setiap bobot antara 0 dan 1
+- Total bobot = 1
 
 **Strategi 1 — Max Sortino Ratio**
 
-<<<<<<< HEAD
-$$\max_{w} \frac{w^T \mu - r_f}{\sqrt{w^T \Sigma_{sv} w}}$$
-
-**Strategi 2 — Min Semivariance**
-
-$$\min_{w} w^T \Sigma_{sv} w$$
-=======
 $$
 \max_{w} \quad \frac{w^T \mu - r_f}{\sqrt{w^T \Sigma_{sv} w}}
 $$
@@ -127,28 +112,17 @@ $$
 $$
 \min_{w} \quad w^T \Sigma_{sv} w
 $$
->>>>>>> 14152edf6c8c1653e22d6a2f1604b7cb472b784d
 
 Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan.
 
 ### Evaluasi Kinerja
 
-<<<<<<< HEAD
-- **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan:
-
-  $$\text{Sortino} = \frac{\bar{R}_p - R_f}{\sigma_{\text{downside}}}$$
-
-- **Cumulative Return**:
-
-  $$R_{\text{cum}} = \exp\left(\sum_{t=1}^{T} r_t\right) - 1$$
-=======
 - **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan
 - **Cumulative Return**:
   
   $$
   R_{\text{cum}} = \exp\left(\sum_{t=1}^{T} r_t\right) - 1
   $$
->>>>>>> 14152edf6c8c1653e22d6a2f1604b7cb472b784d
 
 - **Value at Risk 95%**: Historical Simulation, kuantil ke-5 dari return portofolio aktual, dikonversi ke nominal rupiah dengan dana awal yang dapat dikonfigurasi
 
