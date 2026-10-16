@@ -86,41 +86,43 @@ Korelasi Spearman dipilih (bukan Pearson) karena tidak memerlukan asumsi normali
 
 Matriks semivariance-semicovariance dihitung dengan formula Estrada (2008):
 
-```
-Sigma_sv[i,j] = (1/T) * sum_t [ min(R_i,t - B_t, 0) * min(R_j,t - B_t, 0) ]
-```
+$$\Sigma_{sv}[i,j] = \frac{1}{T} \sum_{t=1}^{T} \min(R_{i,t} - B_t, 0) \cdot \min(R_{j,t} - B_t, 0)$$
 
 dengan:
-- `R_i,t` = log return saham ke-i pada periode t
-- `B_t` = log return benchmark pada periode t
-- `T` = jumlah observasi
+
+- $R_{i,t}$ = log return saham ke-$i$ pada periode $t$
+- $B_t$ = log return benchmark pada periode $t$
+- $T$ = jumlah observasi
 
 Berbeda dengan covariance standar yang memperhitungkan semua deviasi, semivariance hanya memperhitungkan deviasi di bawah benchmark. Ini sesuai dengan perilaku investor yang menghindari risiko downside, bukan semua volatilitas.
 
 ### Optimasi Portofolio
 
 Kedua strategi menggunakan SLSQP dengan kendala yang sama:
-- Long-only: setiap bobot antara 0 dan 1
-- Total bobot = 1
+
+- Long-only: $0 \leq w_i \leq 1$
+- Total bobot sama dengan 1: $\sum_{i=1}^{N} w_i = 1$
 
 **Strategi 1 — Max Sortino Ratio**
 
-```
-maximize  (w^T mu - rf) / sqrt(w^T Sigma_sv w)
-```
+$$\max_{w} \frac{w^T \mu - r_f}{\sqrt{w^T \Sigma_{sv} w}}$$
 
 **Strategi 2 — Min Semivariance**
 
-```
-minimize  w^T Sigma_sv w
-```
+$$\min_{w} w^T \Sigma_{sv} w$$
 
-Kedua strategi menggunakan matriks risiko `Sigma_sv` yang sama. Perbedaan hanya terletak pada fungsi tujuan.
+Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan.
 
 ### Evaluasi Kinerja
 
-- **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan
-- **Cumulative Return**: `exp(sum(log_return)) - 1`
+- **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan:
+
+  $$\text{Sortino} = \frac{\bar{R}_p - R_f}{\sigma_{\text{downside}}}$$
+
+- **Cumulative Return**:
+
+  $$R_{\text{cum}} = \exp\left(\sum_{t=1}^{T} r_t\right) - 1$$
+
 - **Value at Risk 95%**: Historical Simulation, kuantil ke-5 dari return portofolio aktual, dikonversi ke nominal rupiah dengan dana awal yang dapat dikonfigurasi
 
 ---
