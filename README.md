@@ -119,10 +119,8 @@ Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan han
 
 - **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan
 - **Cumulative Return**:
-  
-  $$
-  R_{\text{cum}} = \exp\left(\sum_{t=1}^{T} r_t\right) - 1
-  $$
+
+  $$R_{cum} = e^{\sum_{t=1}^{T} r_t} - 1$$
 
 - **Value at Risk 95%**: Historical Simulation, kuantil ke-5 dari return portofolio aktual, dikonversi ke nominal rupiah dengan dana awal yang dapat dikonfigurasi
 
