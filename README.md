@@ -246,7 +246,7 @@ Default disetel untuk kasus penelitian skripsi, namun semua parameter dapat diub
 | Ticker | 27 saham BISNIS-27 | Daftar konstituen indeks |
 | Benchmark | `^JKSE` | Indeks Harga Saham Gabungan |
 | Risk-free Rate | 4.75% p.a. | BI Rate periode penelitian |
-| Periode | 3 Nov 2025 – 29 Apr 2026 | Periode efektif konstituen |
+| Periode | 3 Nov 2025 – 30 Apr 2026 | Periode efektif konstituen |
 | Threshold Spearman | 0.2 | Ambang batas korelasi rendah |
 | Maksimum Saham | 12 | Batas jumlah saham terpilih |
 | Dana Awal VaR | Rp 100.000.000 | Basis konversi VaR ke rupiah |
