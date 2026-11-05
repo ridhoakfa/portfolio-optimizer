@@ -29,7 +29,7 @@ Dikembangkan sebagai bagian dari skripsi S1 Program Studi Statistika, Universita
 
 Aplikasi ini dirancang untuk membantu investor, analis, dan akademisi dalam membentuk portofolio saham optimal secara kuantitatif. Alih-alih mengandalkan intuisi atau estimasi return historis sederhana, aplikasi ini menggunakan matriks risiko berbasis downside (semivariance-semicovariance) dengan benchmark yang dapat dikonfigurasi.
 
-Aplikasi dapat digunakan untuk ticker apa pun yang tersedia di Yahoo Finance, termasuk saham Indonesia (suffix `.JK`), saham Amerika Serikat, mata uang kripto, ETF, dan indeks. Konfigurasi default disetel untuk 27 saham konstituen Indeks BISNIS-27 dengan benchmark IHSG dan risk-free rate dari BI Rate.
+Aplikasi dapat digunakan untuk ticker apa pun yang tersedia di Yahoo Finance, termasuk saham Indonesia (suffix `.JK`), saham Amerika Serikat, mata uang kripto, ETF, dan indeks. Konfigurasi default disetel untuk 27 saham konstituen Indeks BISNIS-27 dengan benchmark IHSG.
 
 Nilai tambah utama aplikasi ini adalah perbandingan langsung antara dua fungsi tujuan optimasi yang menggunakan matriks risiko yang sama:
 
@@ -46,7 +46,6 @@ Perbandingan kedua strategi bersifat langsung dan setara karena keduanya menerim
 - Input daftar ticker bebas dari Yahoo Finance
 - Benchmark dapat diganti (IHSG, S&P 500, Nikkei, dan lain-lain)
 - Periode penelitian dapat disesuaikan
-- Risk-free rate dapat diubah sesuai tingkat bunga acuan yang relevan
 
 **Analisis Bertahap**
 - Eksplorasi data: statistik deskriptif, harga ternormalisasi Base 100, heatmap korelasi
@@ -104,7 +103,7 @@ Kedua strategi menggunakan SLSQP dengan kendala yang sama:
 **Strategi 1 — Max Sortino Ratio**
 
 $$
-\max_{w} \quad \frac{w^T \mu - r_f}{\sqrt{w^T \Sigma_{sv} w}}
+\max_{w} \quad \frac{w^T \mu - \bar{r}_B}{\sqrt{w^T \Sigma_{sv} w}}
 $$
 
 **Strategi 2 — Min Semivariance**
@@ -113,11 +112,11 @@ $$
 \min_{w} \quad w^T \Sigma_{sv} w
 $$
 
-Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan.
+Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan. Pada Strategi 1, $\bar{r}_B$ adalah rata-rata return benchmark, yang berfungsi sebagai *Minimum Acceptable Return* (MAR).
 
 ### Evaluasi Kinerja
 
-- **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan
+- **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan, menggunakan benchmark sebagai MAR.
 - **Cumulative Return**:
 
   $$R_{cum} = e^{\sum_{t=1}^{T} r_t} - 1$$
@@ -245,7 +244,6 @@ Default disetel untuk kasus penelitian skripsi, namun semua parameter dapat diub
 |---|---|---|
 | Ticker | 27 saham BISNIS-27 | Daftar konstituen indeks |
 | Benchmark | `^JKSE` | Indeks Harga Saham Gabungan |
-| Risk-free Rate | 4.75% p.a. | BI Rate periode penelitian |
 | Periode | 3 Nov 2025 – 30 Apr 2026 | Periode efektif konstituen |
 | Threshold Spearman | 0.2 | Ambang batas korelasi rendah |
 | Maksimum Saham | 12 | Batas jumlah saham terpilih |
@@ -260,22 +258,20 @@ Default disetel untuk kasus penelitian skripsi, namun semua parameter dapat diub
 1. Buka halaman **Input Data**
 2. Ganti daftar ticker menjadi: `AAPL, MSFT, GOOGL, AMZN, META`
 3. Ganti benchmark menjadi: `^GSPC` (S&P 500)
-4. Ganti risk-free rate menjadi: `5.33` (Fed Funds Rate)
-5. Sesuaikan periode sesuai kebutuhan
-6. Klik **Muat Data & Jalankan Seleksi**
+4. Sesuaikan periode sesuai kebutuhan
+5. Klik **Muat Data & Jalankan Seleksi**
 
 ### Mata Uang Kripto
 
 1. Ticker: `BTC-USD, ETH-USD, BNB-USD, SOL-USD, ADA-USD`
 2. Benchmark: `^GSPC` atau indeks kripto lain
-3. Risk-free rate: `0`
-4. Periode: sesuaikan (kripto cenderung memerlukan data 2–3 tahun)
+3. Periode: sesuaikan (kripto cenderung memerlukan data 2–3 tahun)
 
 ### Saham Hong Kong
 
 1. Ticker: `0700.HK, 0939.HK, 1299.HK, 2318.HK, 0981.HK`
 2. Benchmark: `^HSI` (Hang Seng Index)
-3. Risk-free rate: sesuaikan dengan HIBOR atau tingkat bunga acuan Hong Kong
+3. Sesuaikan periode sesuai kebutuhan
 
 ---
 
@@ -340,5 +336,3 @@ Proyek ini bersifat open-source. Penggunaan untuk keperluan akademik, pembelajar
 
 **Ridho Akbar Fadhilah**
 Program Studi Statistika, Universitas Diponegoro
-
-Untuk pertanyaan, saran, atau laporan bug, silakan buka issue di repositori GitHub atau hubungi langsung melalui GitHub.

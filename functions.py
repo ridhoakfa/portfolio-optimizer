@@ -24,7 +24,6 @@ DAFTAR_SAHAM_DEFAULT = [
 ]
 
 BENCHMARK_DEFAULT = "^JKSE"
-RISK_FREE_TAHUNAN_DEFAULT = 0.0475
 START_DATE_DEFAULT = "2025-11-03"
 END_DATE_DEFAULT = "2026-04-30"
 
@@ -63,7 +62,6 @@ def load_data_saham(tickers, start_date, end_date):
             auto_adjust=True,
         )
     except Exception as e:
-        # Raise sebagai ConnectionError agar bisa ditangkap jelas di main.py
         raise ConnectionError(
             f"Gagal mengunduh data dari Yahoo Finance: {type(e).__name__}. "
             f"Periksa koneksi internet."
@@ -74,13 +72,9 @@ def load_data_saham(tickers, start_date, end_date):
             f"Tidak ada data untuk ticker pada periode {start_date} sampai {end_date}."
         )
 
-    # Yahoo Finance mengembalikan kolom MultiIndex (Price, Ticker) saat
-    # mengunduh lebih dari satu ticker. Kita hanya butuh harga Close.
     if isinstance(data.columns, pd.MultiIndex):
         data = data["Close"]
 
-    # Forward fill untuk hari libur yang tidak ada data, lalu drop baris
-    # yang seluruhnya kosong (biasanya di awal/akhir periode).
     return data.ffill().dropna(how="all")
 
 
@@ -114,7 +108,6 @@ def load_data_benchmark(ticker, start_date, end_date):
     if isinstance(data.columns, pd.MultiIndex):
         data = data["Close"]
 
-    # squeeze() mengubah DataFrame satu kolom menjadi Series
     series = data.squeeze()
     return series.ffill().dropna()
 
@@ -160,10 +153,8 @@ def seleksi_saham_dua_tahap(log_return, expected_return, threshold=0.2, max_saha
         saham_positif, saham_terpilih, spearman_matrix, pasangan_df,
         pasangan_terpilih, dan pesan (jika ada peringatan).
     """
-    # Tahap 1: filter expected return positif
     saham_positif = expected_return[expected_return > 0].index.tolist()
 
-    # Jika kandidat terlalu sedikit, kembalikan lebih awal dengan pesan
     if len(saham_positif) < 2:
         return {
             "saham_positif": saham_positif,
@@ -177,7 +168,6 @@ def seleksi_saham_dua_tahap(log_return, expected_return, threshold=0.2, max_saha
             ),
         }
 
-    # Hitung matriks korelasi Spearman antar saham kandidat
     spearman_corr, _ = spearmanr(log_return[saham_positif].values)
     spearman_matrix = pd.DataFrame(
         spearman_corr,
@@ -185,7 +175,6 @@ def seleksi_saham_dua_tahap(log_return, expected_return, threshold=0.2, max_saha
         columns=saham_positif,
     )
 
-    # Kumpulkan semua pasangan unik dengan nilai korelasinya
     pasangan = []
     for i in range(len(saham_positif)):
         for j in range(i + 1, len(saham_positif)):
@@ -197,19 +186,16 @@ def seleksi_saham_dua_tahap(log_return, expected_return, threshold=0.2, max_saha
 
     pasangan_df = pd.DataFrame(pasangan).sort_values("Korelasi").reset_index(drop=True)
 
-    # Tahap 2: ambil pasangan yang lolos threshold, deduplikasi
     pasangan_terpilih = pasangan_df[pasangan_df["Korelasi"] < threshold].copy()
 
     saham_terpilih = []
     for _, row in pasangan_terpilih.iterrows():
         if len(saham_terpilih) >= max_saham:
             break
-        # Tambahkan kedua saham dari pasangan ini jika belum ada
         for s in [row["Saham A"], row["Saham B"]]:
             if s not in saham_terpilih and len(saham_terpilih) < max_saham:
                 saham_terpilih.append(s)
 
-    # Beri peringatan jika saham terpilih terlalu sedikit untuk portofolio
     pesan = None
     if len(saham_terpilih) < 3:
         pesan = (
@@ -253,16 +239,15 @@ def hitung_matriks_semivariance(returns, benchmark):
     benchmark = np.asarray(benchmark).reshape(-1, 1)
 
     T = returns.shape[0]
-    # Downside = min(R - B, 0); hanya selisih negatif yang dihitung
     downside = np.minimum(returns - benchmark, 0)
     return (downside.T @ downside) / T
 
 
-def optimasi_slsqp_max_sortino(mu, sigma_sv, rf_daily, n_starts=10):
+def optimasi_slsqp_max_sortino(mu, sigma_sv, benchmark_mean, n_starts=10):
     """
     Optimasi SLSQP untuk memaksimalkan Sortino Ratio portofolio.
 
-    Sortino = (Return_portofolio - rf) / semideviation
+    Sortino = (Return_portofolio - benchmark_mean) / semideviation
 
     Kendala:
         - Long-only: setiap bobot antara 0 dan 1
@@ -279,13 +264,11 @@ def optimasi_slsqp_max_sortino(mu, sigma_sv, rf_daily, n_starts=10):
     mu = np.asarray(mu)
     sigma_sv = np.asarray(sigma_sv)
 
-    # SLSQP hanya bisa meminimalkan, jadi Sortino dinegatifkan
     def neg_sortino(w):
         ret = w @ mu
         svar = w @ sigma_sv @ w
-        # Guard agar tidak bagi nol saat optimasi menjelajah titik awal
         sd = np.sqrt(svar) if svar > 0 else 1e-8
-        return -(ret - rf_daily) / sd
+        return -(ret - benchmark_mean) / sd
 
     bounds = [(0.0, 1.0) for _ in range(n_assets)]
     constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
@@ -307,14 +290,12 @@ def optimasi_slsqp_max_sortino(mu, sigma_sv, rf_daily, n_starts=10):
                 options={"maxiter": 1000, "ftol": 1e-9},
             )
         except Exception:
-            # Skip start ini kalau SLSQP gagal konvergen
             continue
 
         if result.success and -result.fun > best_sortino:
             best_sortino = float(-result.fun)
             best_weights = result.x
 
-    # Fallback: kalau semua start gagal, pakai equal weight
     if best_weights is None:
         best_weights = np.ones(n_assets) / n_assets
         best_sortino = float(-neg_sortino(best_weights))
@@ -395,35 +376,34 @@ def hitung_semideviation(returns, benchmark):
     return float(np.sqrt(np.mean(downside ** 2)))
 
 
-def hitung_sortino(returns, rf_annual, benchmark):
+def hitung_sortino(returns, benchmark):
     """
-    Hitung Sortino Ratio harian dan tahunan.
+    Hitung Sortino Ratio harian dan tahunan dengan MAR sebesar return benchmark.
 
-    Sortino tahunan dihitung dari return tahunan dan semideviation
-    tahunan (dikonversi dengan faktor sqrt(252)).
+    Pembilang memakai excess return portofolio terhadap benchmark.
+    Penyebut memakai semideviation portofolio terhadap benchmark.
 
     Returns
     -------
     dict dengan sortino_harian, sortino_tahunan, semidev_harian,
-    semidev_tahunan, dan return_tahunan.
+    semidev_tahunan, return_tahunan, dan benchmark_tahunan.
     """
     returns = np.asarray(returns)
-    rf_daily = rf_annual / HARI_BURSA_SETAHUN
+    benchmark = np.asarray(benchmark)
 
     semidev_harian = hitung_semideviation(returns, benchmark)
     semidev_tahunan = semidev_harian * np.sqrt(HARI_BURSA_SETAHUN)
 
-    # Annualisasi return menggunakan compounding eksponensial dari log return
     return_tahunan = float(np.exp(np.mean(returns) * HARI_BURSA_SETAHUN) - 1)
+    benchmark_tahunan = float(np.exp(np.mean(benchmark) * HARI_BURSA_SETAHUN) - 1)
 
-    # Guard pembagian nol
     if semidev_harian > 0:
-        sortino_harian = (np.mean(returns) - rf_daily) / semidev_harian
+        sortino_harian = (np.mean(returns) - np.mean(benchmark)) / semidev_harian
     else:
         sortino_harian = 0.0
 
     if semidev_tahunan > 0:
-        sortino_tahunan = (return_tahunan - rf_annual) / semidev_tahunan
+        sortino_tahunan = (return_tahunan - benchmark_tahunan) / semidev_tahunan
     else:
         sortino_tahunan = 0.0
 
@@ -433,6 +413,7 @@ def hitung_sortino(returns, rf_annual, benchmark):
         "semidev_harian": float(semidev_harian),
         "semidev_tahunan": float(semidev_tahunan),
         "return_tahunan": return_tahunan,
+        "benchmark_tahunan": benchmark_tahunan,
     }
 
 
@@ -473,7 +454,6 @@ def hitung_var_historical(returns, alpha=0.05, dana_awal=100_000_000):
 
     n_obs = len(returns)
 
-    # Minimal observasi untuk VaR 95%
     if n_obs < MIN_OBSERVASI:
         return {
             "q_alpha": float("nan"),
@@ -484,12 +464,10 @@ def hitung_var_historical(returns, alpha=0.05, dana_awal=100_000_000):
             "pesan": f"Data terlalu sedikit untuk VaR. Minimal {MIN_OBSERVASI} observasi.",
         }
 
-    # Urutkan return, ambil return pada posisi kuantil bawah
     returns_sorted = np.sort(returns)
     k = max(int(np.floor(alpha * n_obs)), 1)
     q_alpha = float(returns_sorted[k - 1])
 
-    # q_alpha negatif = ada kerugian; positif = periode sangat baik
     if q_alpha < 0:
         var_persen = -q_alpha * 100
         var_rupiah = dana_awal * (-q_alpha)
@@ -512,10 +490,10 @@ def hitung_var_historical(returns, alpha=0.05, dana_awal=100_000_000):
     }
 
 
-def bandingkan_strategi(returns, bobot_max_sortino, bobot_min_sv, rf_annual, benchmark):
+def bandingkan_strategi(returns, bobot_max_sortino, bobot_min_sv, benchmark):
     """
     Bandingkan dua strategi optimasi SLSQP menggunakan matriks risiko
-    yang sama (Semivariance-Semicovariance).
+    yang sama (Semivariance-Semicovariance) dan MAR sebesar return benchmark.
 
     Return DataFrame siap tampil di halaman Perbandingan Strategi.
     """
@@ -524,8 +502,8 @@ def bandingkan_strategi(returns, bobot_max_sortino, bobot_min_sv, rf_annual, ben
     return_max = returns @ np.asarray(bobot_max_sortino)
     return_min = returns @ np.asarray(bobot_min_sv)
 
-    sortino_max = hitung_sortino(return_max, rf_annual, benchmark)
-    sortino_min = hitung_sortino(return_min, rf_annual, benchmark)
+    sortino_max = hitung_sortino(return_max, benchmark)
+    sortino_min = hitung_sortino(return_min, benchmark)
 
     var_max = hitung_var_historical(return_max)
     var_min = hitung_var_historical(return_min)
@@ -578,14 +556,12 @@ def deteksi_ketidakcocokan_benchmark(tickers, benchmark):
     n_jk = sum(1 for t in tickers if t.upper().endswith(".JK"))
     benchmark_upper = benchmark.upper()
 
-    # Mayoritas saham ID tapi benchmark bukan IHSG
     if n_jk > len(tickers) / 2 and benchmark_upper != "^JKSE":
         return (
             "Mayoritas ticker adalah saham Indonesia (.JK), tetapi benchmark bukan IHSG (^JKSE). "
             "Pertimbangkan ganti benchmark ke ^JKSE untuk hasil yang lebih relevan."
         )
 
-    # Mayoritas bukan saham ID tapi benchmark IHSG
     if n_jk < len(tickers) / 2 and benchmark_upper == "^JKSE":
         return (
             "Sebagian besar ticker bukan saham Indonesia, tetapi benchmark adalah IHSG (^JKSE). "

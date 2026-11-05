@@ -16,7 +16,6 @@ import plotly.graph_objects as go
 from functions import (
     DAFTAR_SAHAM_DEFAULT,
     BENCHMARK_DEFAULT,
-    RISK_FREE_TAHUNAN_DEFAULT,
     START_DATE_DEFAULT,
     END_DATE_DEFAULT,
     THRESHOLD_KORELASI_DEFAULT,
@@ -48,8 +47,6 @@ st.set_page_config(
 )
 
 
-# Palet warna garis untuk Plotly. Sengaja pakai hex karena plotly_white
-# punya tema sendiri yang tidak mengikuti dark mode Streamlit.
 PALETTE_LINE = [
     "#1E3A8A", "#D97706", "#475569", "#047857", "#B91C1C",
     "#0369A1", "#7C3AED", "#DB2777", "#0891B2", "#65A30D",
@@ -61,12 +58,8 @@ PALETTE_PIE = [
     "#0F1E54", "#92400E",
 ]
 
-# Bobot di bawah ambang ini dianggap nol. Mencegah pie chart menampilkan
-# notasi ilmiah (misal 2.49e-15%) untuk saham dengan bobot numerik nol.
 BOBOT_MINIMAL_TAMPIL = 1e-6
 
-# Border tipis untuk hairline dan card. Memakai rgba mid-gray agar tetap
-# terlihat di light mode (abu di atas putih) maupun dark mode (abu di atas hitam).
 BORDER_HAIRLINE = "1px solid rgba(128, 128, 128, 0.2)"
 BORDER_DASHED = "1px dashed rgba(128, 128, 128, 0.25)"
 
@@ -95,7 +88,6 @@ def init_state():
         "config": {
             "tickers": DAFTAR_SAHAM_DEFAULT,
             "benchmark": BENCHMARK_DEFAULT,
-            "risk_free_pct": RISK_FREE_TAHUNAN_DEFAULT * 100,
             "start_date": START_DATE_DEFAULT,
             "end_date": END_DATE_DEFAULT,
             "threshold": THRESHOLD_KORELASI_DEFAULT,
@@ -136,8 +128,6 @@ def require_optimization():
         )
         st.stop()
 
-
-# Helper UI
 
 def hairline_header(title, metadata=""):
     """
@@ -293,8 +283,6 @@ def _pie_bobot(saham_list, bobot, warna_series):
     return fig
 
 
-# Sidebar
-
 def render_sidebar():
     """
     Sidebar dengan navigasi dan status data.
@@ -302,7 +290,6 @@ def render_sidebar():
     Return nama halaman bersih untuk routing.
     """
     with st.sidebar:
-        # Judul aplikasi
         st.markdown(
             """
             <div style="padding: 12px 0 16px;">
@@ -317,7 +304,6 @@ def render_sidebar():
             unsafe_allow_html=True,
         )
 
-        # Navigasi utama dengan icon Material Symbols di setiap opsi
         page_raw = st.radio(
             "Navigasi",
             options=[
@@ -332,12 +318,10 @@ def render_sidebar():
             label_visibility="collapsed",
         )
 
-        # Strip prefix icon (:material/xxx: Nama) untuk dapat nama halaman
         page = page_raw.split(" ", 1)[-1] if " " in page_raw else page_raw
 
         st.divider()
 
-        # Status data yang sudah dimuat
         st.markdown(
             """
             <div style="font-size: 0.65rem; font-weight: 600;
@@ -355,7 +339,6 @@ def render_sidebar():
             n_saham = st.session_state.data_saham.shape[1]
             n_hari = st.session_state.data_saham.shape[0]
             bench = st.session_state.config["benchmark"]
-            rf = st.session_state.config["risk_free_pct"]
             n_terpilih = len(st.session_state.saham_terpilih or [])
 
             st.markdown(
@@ -368,7 +351,6 @@ def render_sidebar():
                         {n_saham} saham · {n_hari} hari
                     </div>
                     <div style="opacity: 0.8;">Benchmark: {bench}</div>
-                    <div style="opacity: 0.8;">Risk-free: {rf:.2f}% p.a.</div>
                     <div style="opacity: 0.8;">Terpilih: {n_terpilih} saham</div>
                     <div style="opacity: 0.8;">Threshold: Spearman &lt; {threshold}</div>
                 </div>
@@ -404,13 +386,10 @@ def _sidebar_metadata():
     return f"{n_saham} saham · {n_hari} hari · {bench}"
 
 
-# Halaman Home
-
 def render_home():
     """Halaman Home: penjelasan aplikasi, alur analisis, dan konfigurasi default."""
     hairline_header("Portofolio Optimizer", "By: Ridho Akbar Fadhilah")
 
-    # Judul dan deskripsi singkat
     st.markdown(
         """
         <div style="font-size: 1.55rem; font-weight: 600;
@@ -450,7 +429,6 @@ def render_home():
 
     section_title("Alur Analisis")
 
-    # Enam kartu langkah analisis
     steps = [
         ("01", "Input Data", "Unduh harga historis dari Yahoo Finance dan hitung log return harian."),
         ("02", "Eksplorasi Data", "Statistik deskriptif, distribusi return, dan matriks korelasi antar aset."),
@@ -484,7 +462,6 @@ def render_home():
 
     section_title("Konfigurasi Default")
 
-    # Tabel konfigurasi default
     st.markdown(
         f"""
         <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
@@ -507,12 +484,6 @@ def render_home():
                 </td>
             </tr>
             <tr style="border-bottom: {BORDER_HAIRLINE};">
-                <td style="padding: 10px 0; opacity: 0.7;">Risk-free</td>
-                <td style="padding: 10px 0; font-family: monospace;">
-                    BI Rate {RISK_FREE_TAHUNAN_DEFAULT * 100:.2f}% p.a.
-                </td>
-            </tr>
-            <tr style="border-bottom: {BORDER_HAIRLINE};">
                 <td style="padding: 10px 0; opacity: 0.7;">Threshold Spearman</td>
                 <td style="padding: 10px 0; font-family: monospace;">
                     {THRESHOLD_KORELASI_DEFAULT}
@@ -530,8 +501,6 @@ def render_home():
     )
 
 
-# Halaman Input Data
-
 def _parse_tickers(text):
     """
     Parse input ticker dari textarea.
@@ -545,7 +514,7 @@ def _parse_tickers(text):
     return tickers
 
 
-def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
+def _jalankan_pipeline(tickers, benchmark, start_date, end_date,
                        threshold, max_saham, dana_awal):
     """
     Pipeline utama saat user klik "Muat Data & Jalankan Seleksi":
@@ -567,7 +536,6 @@ def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
         st.error(str(e))
         return
 
-    # Hanya ambil tanggal yang ada di kedua dataset
     idx_bersama = data_saham.index.intersection(data_benchmark.index)
     data_saham = data_saham.loc[idx_bersama]
     data_benchmark = data_benchmark.loc[idx_bersama]
@@ -579,7 +547,6 @@ def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
         )
         return
 
-    # Perhitungan return dan seleksi
     log_return = hitung_log_return(data_saham)
     log_return_benchmark = hitung_log_return(data_benchmark)
     expected_return = hitung_expected_return(log_return)
@@ -591,7 +558,6 @@ def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
 
     saham_terpilih = hasil_seleksi["saham_terpilih"]
 
-    # Peringatan jika seleksi menghasilkan sedikit saham
     if len(saham_terpilih) < 3:
         st.warning(
             f"Hanya {len(saham_terpilih)} saham lolos seleksi. "
@@ -601,7 +567,6 @@ def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
         if hasil_seleksi.get("pesan"):
             st.info(hasil_seleksi["pesan"])
 
-    # Simpan hasil ke session_state
     st.session_state.data_saham = data_saham
     st.session_state.data_benchmark = data_benchmark
     st.session_state.log_return = log_return
@@ -610,11 +575,9 @@ def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
     st.session_state.hasil_seleksi = hasil_seleksi
     st.session_state.saham_terpilih = saham_terpilih
 
-    # Update config agar konsisten di sidebar
     st.session_state.config.update({
         "tickers": tickers,
         "benchmark": benchmark,
-        "risk_free_pct": risk_free_pct,
         "start_date": start_date,
         "end_date": end_date,
         "threshold": threshold,
@@ -622,7 +585,6 @@ def _jalankan_pipeline(tickers, benchmark, risk_free_pct, start_date, end_date,
         "dana_awal": dana_awal,
     })
 
-    # Reset hasil hilir karena data berubah
     for key in ["matriks_sv", "returns_terpilih", "benchmark_aligned",
                 "mu_terpilih", "bobot_max_sortino", "bobot_min_sv",
                 "sortino_max", "perbandingan"]:
@@ -649,8 +611,8 @@ def render_input_data():
         )
 
     info_box(
-        "Default disetel untuk BISNIS-27 dengan benchmark IHSG dan risk-free BI Rate. "
-        "Untuk aset lain, sesuaikan benchmark dan risk-free di kolom sebelah.",
+        "Default disetel untuk BISNIS-27 dengan benchmark IHSG. "
+        "Untuk aset lain, sesuaikan benchmark di kolom sebelah.",
         kind="info",
     )
 
@@ -672,14 +634,6 @@ def render_input_data():
             "Benchmark",
             value=st.session_state.config["benchmark"],
             help="Contoh: ^JKSE (IHSG), ^GSPC (S&P 500), ^N225 (Nikkei)",
-        )
-        risk_free_input = st.number_input(
-            "Risk-Free Rate (% p.a.)",
-            min_value=0.0,
-            max_value=20.0,
-            value=float(st.session_state.config["risk_free_pct"]),
-            step=0.25,
-            help="BI Rate untuk saham ID, Fed Rate untuk saham US, 0 untuk kripto",
         )
 
     section_title("Periode dan Parameter Seleksi")
@@ -723,7 +677,6 @@ def render_input_data():
             format="%d",
         )
 
-    # Peringatan otomatis jika ticker dan benchmark tidak cocok
     tickers_parsed = _parse_tickers(tickers_input)
     warning = deteksi_ketidakcocokan_benchmark(tickers_parsed, benchmark_input)
     if warning:
@@ -741,7 +694,6 @@ def render_input_data():
         _jalankan_pipeline(
             tickers=tickers_parsed,
             benchmark=benchmark_input.strip().upper(),
-            risk_free_pct=risk_free_input,
             start_date=str(start_input),
             end_date=str(end_input),
             threshold=threshold_input,
@@ -749,8 +701,6 @@ def render_input_data():
             dana_awal=dana_awal_input,
         )
 
-
-# Halaman Eksplorasi Data
 
 def render_eksplorasi():
     """
@@ -765,7 +715,6 @@ def render_eksplorasi():
 
     section_title("Statistik Deskriptif Return Harian")
 
-    # Statistik per saham; nilai dalam persen agar mudah dibaca
     stat_desc = pd.DataFrame({
         "Mean": log_return.mean(),
         "Std Dev": log_return.std(),
@@ -791,7 +740,6 @@ def render_eksplorasi():
         "dari hari pertama; nilai 80 berarti turun 20%."
     )
 
-    # Normalisasi harga ke Base 100
     normalized = data_saham / data_saham.iloc[0] * 100
 
     fig = go.Figure()
@@ -805,8 +753,6 @@ def render_eksplorasi():
             hovertemplate="<b>%{fullData.name}</b><br>Tanggal: %{x}<br>Nilai: %{y:.2f}<extra></extra>",
         ))
 
-    # hovermode="closest" agar hanya satu garis yang di-highlight saat hover.
-    # Legend ditaruh di samping kanan agar tidak menutupi plot.
     fig.update_layout(
         template="plotly_white",
         height=520,
@@ -830,7 +776,6 @@ def render_eksplorasi():
 
     corr_matrix = log_return.corr()
 
-    # Warna diverging: biru negatif, putih nol, merah positif
     fig_heat = go.Figure(data=go.Heatmap(
         z=corr_matrix.values,
         x=corr_matrix.columns.tolist(),
@@ -858,8 +803,6 @@ def render_eksplorasi():
     st.plotly_chart(fig_heat, width="stretch")
 
 
-# Halaman Seleksi Saham
-
 def render_seleksi():
     """
     Halaman seleksi saham: menampilkan hasil dua tahap seleksi
@@ -880,7 +823,6 @@ def render_seleksi():
 
     section_title("Tahap 1 — Expected Return Positif")
 
-    # Tabel saham yang lolos filter E(R) > 0
     if hasil["saham_positif"]:
         expected_return = st.session_state.expected_return
         er_positif = pd.DataFrame({
@@ -966,8 +908,6 @@ def render_seleksi():
         empty_state("Tidak ada saham yang lolos seleksi.")
 
 
-# Halaman Optimasi Portofolio
-
 def _jalankan_optimasi():
     """
     Jalankan dua optimasi SLSQP:
@@ -977,12 +917,11 @@ def _jalankan_optimasi():
     """
     mu = st.session_state.mu_terpilih
     sigma_sv = st.session_state.matriks_sv
-    rf_annual = st.session_state.config["risk_free_pct"] / 100
-    rf_daily = rf_annual / HARI_BURSA_SETAHUN
+    benchmark_mean = float(np.mean(st.session_state.benchmark_aligned))
 
     with st.spinner("Mengoptimasi portofolio dengan SLSQP..."):
         bobot_max_sortino, sortino_max = optimasi_slsqp_max_sortino(
-            mu, sigma_sv, rf_daily, n_starts=10
+            mu, sigma_sv, benchmark_mean, n_starts=10
         )
         bobot_min_sv = optimasi_slsqp_min_semivariance(
             sigma_sv, n_starts=10
@@ -1005,7 +944,6 @@ def render_optimasi():
     log_return = st.session_state.log_return
     log_return_benchmark = st.session_state.log_return_benchmark
 
-    # Hitung matriks semivariance sekali saja; simpan di session_state
     if st.session_state.matriks_sv is None:
         returns_terpilih = log_return[saham_terpilih].values
         benchmark_aligned = log_return_benchmark.loc[log_return.index].values
@@ -1033,7 +971,6 @@ def render_optimasi():
         _jalankan_optimasi()
         st.success("Optimasi selesai.")
 
-    # Tampilkan hasil kalau sudah ada
     if st.session_state.bobot_max_sortino is not None:
         _render_hasil_optimasi()
 
@@ -1046,7 +983,6 @@ def _render_hasil_optimasi():
     saham_terpilih = st.session_state.saham_terpilih
     bobot_max = st.session_state.bobot_max_sortino
     bobot_min = st.session_state.bobot_min_sv
-    rf_annual = st.session_state.config["risk_free_pct"] / 100
 
     returns = st.session_state.returns_terpilih
     benchmark = st.session_state.benchmark_aligned
@@ -1104,12 +1040,11 @@ def _render_hasil_optimasi():
     })
     st.dataframe(df_compare, hide_index=True, width="stretch")
 
-    # Hitung Sortino aktual dari return yang dihasilkan masing-masing strategi
     return_max = returns @ bobot_max
     return_min = returns @ bobot_min
 
-    sortino_max_actual = hitung_sortino(return_max, rf_annual, benchmark)
-    sortino_min_actual = hitung_sortino(return_min, rf_annual, benchmark)
+    sortino_max_actual = hitung_sortino(return_max, benchmark)
+    sortino_min_actual = hitung_sortino(return_min, benchmark)
 
     section_title("Sortino Ratio — Perbandingan")
 
@@ -1130,8 +1065,6 @@ def _render_hasil_optimasi():
         )
 
 
-# Halaman Evaluasi Kinerja
-
 def render_evaluasi():
     """
     Halaman evaluasi kinerja: metric cards untuk kedua strategi,
@@ -1144,15 +1077,13 @@ def render_evaluasi():
     benchmark = st.session_state.benchmark_aligned
     bobot_max = st.session_state.bobot_max_sortino
     bobot_min = st.session_state.bobot_min_sv
-    rf_annual = st.session_state.config["risk_free_pct"] / 100
     dana_awal = st.session_state.config["dana_awal"]
 
-    # Hitung metrik untuk kedua strategi
     return_max = returns @ bobot_max
     return_min = returns @ bobot_min
 
-    sortino_max = hitung_sortino(return_max, rf_annual, benchmark)
-    sortino_min = hitung_sortino(return_min, rf_annual, benchmark)
+    sortino_max = hitung_sortino(return_max, benchmark)
+    sortino_min = hitung_sortino(return_min, benchmark)
     cumret_max = hitung_cumulative_return(return_max)
     cumret_min = hitung_cumulative_return(return_min)
     var_max = hitung_var_historical(return_max, alpha=0.05, dana_awal=dana_awal)
@@ -1218,7 +1149,6 @@ def render_evaluasi():
             sublabel=f"Setara {var_min['var_persen']:.2f}% dari dana",
         )
 
-    # Peringatan kalau VaR tidak bisa dihitung
     if var_max.get("pesan"):
         info_box(var_max["pesan"], kind="warning")
 
@@ -1226,7 +1156,6 @@ def render_evaluasi():
 
     idx = st.session_state.log_return.index[:len(return_max)]
 
-    # Cumulative return dari log return
     cum_max = np.exp(pd.Series(return_max, index=idx).cumsum()) - 1
     cum_min = np.exp(pd.Series(return_min, index=idx).cumsum()) - 1
     cum_bench = np.exp(pd.Series(benchmark, index=idx).cumsum()) - 1
@@ -1266,7 +1195,6 @@ def render_evaluasi():
 
     section_title("Distribusi Return & VaR 95%")
 
-    # Dropdown untuk memilih strategi yang mau dilihat distribusinya
     pilihan = st.selectbox(
         "Pilih strategi untuk distribusi return:",
         options=["Max Sortino", "Min Semivariance"],
@@ -1290,7 +1218,6 @@ def render_evaluasi():
         name="Return Harian",
     ))
 
-    # Garis vertikal VaR dan mean sebagai referensi
     fig_hist.add_vline(
         x=var_plot["q_alpha"] * 100,
         line=dict(color="#92400E", width=2, dash="dash"),
@@ -1316,8 +1243,6 @@ def render_evaluasi():
     st.plotly_chart(fig_hist, width="stretch")
 
 
-# Halaman Perbandingan Strategi
-
 def render_perbandingan():
     """
     Halaman perbandingan strategi: tabel metrik, plot cumulative return,
@@ -1330,12 +1255,10 @@ def render_perbandingan():
     benchmark = st.session_state.benchmark_aligned
     bobot_max = st.session_state.bobot_max_sortino
     bobot_min = st.session_state.bobot_min_sv
-    rf_annual = st.session_state.config["risk_free_pct"] / 100
 
-    # Cache hasil perbandingan agar tidak hitung ulang setiap rerun
     if st.session_state.perbandingan is None:
         perbandingan = bandingkan_strategi(
-            returns, bobot_max, bobot_min, rf_annual, benchmark,
+            returns, bobot_max, bobot_min, benchmark,
         )
         st.session_state.perbandingan = perbandingan
 
@@ -1390,9 +1313,8 @@ def render_perbandingan():
 
     section_title("Narasi Hasil")
 
-    # Kumpulkan nilai metrik untuk narasi otomatis
-    sortino_max_val = hitung_sortino(return_max, rf_annual, benchmark)
-    sortino_min_val = hitung_sortino(return_min, rf_annual, benchmark)
+    sortino_max_val = hitung_sortino(return_max, benchmark)
+    sortino_min_val = hitung_sortino(return_min, benchmark)
     var_max_val = hitung_var_historical(return_max)
     var_min_val = hitung_var_historical(return_min)
     cumret_max_val = hitung_cumulative_return(return_max)
@@ -1400,7 +1322,6 @@ def render_perbandingan():
 
     parts = []
 
-    # Narasi 1: perbandingan Sortino
     if sortino_max_val["sortino_tahunan"] > sortino_min_val["sortino_tahunan"]:
         parts.append(
             f"<strong>SLSQP max Sortino unggul dalam risk-adjusted return</strong> "
@@ -1415,7 +1336,6 @@ def render_perbandingan():
             f"bukan memaksimalkan Sortino."
         )
 
-    # Narasi 2: perbandingan cumulative return
     if cumret_max_val > cumret_min_val:
         parts.append(
             f"Cumulative return max Sortino lebih tinggi "
@@ -1427,7 +1347,6 @@ def render_perbandingan():
             f"({cumret_min_val * 100:.2f}% vs {cumret_max_val * 100:.2f}%)."
         )
 
-    # Narasi 3: perbandingan VaR
     if var_max_val["var_rupiah"] < var_min_val["var_rupiah"]:
         parts.append(
             f"Risiko downside max Sortino lebih kecil "
@@ -1441,7 +1360,6 @@ def render_perbandingan():
             f"Rp {var_max_val['var_rupiah']:,.0f})."
         )
 
-    # Render narasi dalam box dengan border adaptif
     st.markdown(
         f"""
         <div style="border: {BORDER_HAIRLINE};
