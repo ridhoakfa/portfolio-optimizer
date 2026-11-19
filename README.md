@@ -48,15 +48,15 @@ Perbandingan kedua strategi bersifat langsung dan setara karena keduanya menerim
 - Periode penelitian dapat disesuaikan
 
 **Analisis Bertahap**
-- Eksplorasi data: statistik deskriptif, harga ternormalisasi Base 100, heatmap korelasi
+- Eksplorasi data: statistik deskriptif return harian dan harga ternormalisasi Base 100
 - Seleksi dua tahap: filter expected return positif dan seleksi korelasi Spearman
 - Perhitungan matriks semivariance-semicovariance dengan benchmark
 - Optimasi SLSQP dengan dua fungsi tujuan alternatif
 
 **Evaluasi Kinerja**
-- Sortino Ratio (harian dan tahunan)
+- Sortino Ratio harian
 - Cumulative Return
-- Value at Risk 95% dengan Historical Simulation
+- Value at Risk 95% dengan Simulasi Historis
 - Perbandingan langsung antara kedua strategi
 
 **Antarmuka**
@@ -77,9 +77,7 @@ Saham dengan rata-rata log return negatif pada periode penelitian dieliminasi. D
 
 **Tahap 2 — Seleksi Korelasi Spearman**
 
-Dari saham yang lolos tahap pertama, dipilih pasangan saham dengan korelasi Spearman di bawah threshold tertentu (default 0.2). Prinsipnya, korelasi rendah antar saham memberikan diversifikasi yang lebih efektif.
-
-Korelasi Spearman dipilih (bukan Pearson) karena tidak memerlukan asumsi normalitas dan lebih tahan terhadap outlier.
+Dari saham yang lolos tahap pertama, pasangan saham diurutkan dari korelasi Spearman terendah. Saham diambil dari pasangan yang korelasinya di bawah threshold (default 0,2) sampai batas maksimum saham (default 13) tercapai. Batas korelasi berlaku untuk pasangan asal setiap saham terpilih.
 
 ### Matriks Risiko
 
@@ -103,7 +101,7 @@ Kedua strategi menggunakan SLSQP dengan kendala yang sama:
 **Strategi 1 — Max Sortino Ratio**
 
 $$
-\max_{w} \quad \frac{w^T \mu - \bar{r}_B}{\sqrt{w^T \Sigma_{sv} w}}
+\max_{w} \quad \frac{w^T \mu - \bar{B}}{\sqrt{w^T \Sigma_{sv} w}}
 $$
 
 **Strategi 2 — Min Semivariance**
@@ -112,16 +110,20 @@ $$
 \min_{w} \quad w^T \Sigma_{sv} w
 $$
 
-Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan. Pada Strategi 1, $\bar{r}_B$ adalah rata-rata return benchmark, yang berfungsi sebagai *Minimum Acceptable Return* (MAR).
+Kedua strategi menggunakan matriks risiko $\Sigma_{sv}$ yang sama. Perbedaan hanya terletak pada fungsi tujuan. Pada Strategi 1, $\bar{B}$ adalah rata-rata return benchmark harian; return benchmark berfungsi sebagai *Minimum Acceptable Return* (MAR).
 
 ### Evaluasi Kinerja
 
-- **Sortino Ratio**: rasio excess return terhadap semideviation, dihitung harian dan tahunan, menggunakan benchmark sebagai MAR.
+- **Sortino Ratio**: dihitung dengan rumus yang sama dengan fungsi tujuan Strategi 1, yaitu $(w^T \mu - \bar{B}) / \sqrt{w^T \Sigma_{sv} w}$, dalam skala harian.
 - **Cumulative Return**:
 
   $$R_{cum} = e^{\sum_{t=1}^{T} r_t} - 1$$
 
-- **Value at Risk 95%**: Historical Simulation, kuantil ke-5 dari return portofolio aktual, dikonversi ke nominal rupiah dengan dana awal yang dapat dikonfigurasi
+- **Value at Risk 95%**: Simulasi Historis. Return portofolio diurutkan dari terkecil, lalu diambil return ke-$k$ dengan $k = \lceil \alpha T \rceil$ ($\alpha = 0{,}05$):
+
+  $$VaR = V_0 \times (-R_{P,(k)}) \times \sqrt{t}$$
+
+  dengan $V_0$ dana awal (default Rp100.000.000) dan $t$ periode holding (1 hari).
 
 ---
 
@@ -194,7 +196,7 @@ Aplikasi ini memiliki tujuh halaman yang sebaiknya dikunjungi secara berurutan:
 
 1. **Home** — penjelasan aplikasi dan alur analisis
 2. **Input Data** — konfigurasi ticker, benchmark, periode, dan parameter seleksi
-3. **Eksplorasi Data** — statistik deskriptif, harga ternormalisasi, heatmap korelasi
+3. **Eksplorasi Data** — statistik deskriptif dan harga ternormalisasi
 4. **Seleksi Saham** — hasil seleksi dua tahap dengan heatmap Spearman
 5. **Optimasi Portofolio** — menjalankan kedua strategi dan melihat bobot optimal
 6. **Evaluasi Kinerja** — metrik kinerja, cumulative return, dan VaR untuk kedua strategi
@@ -244,9 +246,9 @@ Default disetel untuk kasus penelitian skripsi, namun semua parameter dapat diub
 |---|---|---|
 | Ticker | 27 saham BISNIS-27 | Daftar konstituen indeks |
 | Benchmark | `^JKSE` | Indeks Harga Saham Gabungan |
-| Periode | 3 Nov 2025 – 30 Apr 2026 | Periode efektif konstituen |
+| Periode | 3 Nov 2025 – 30 Apr 2026 | Periode efektif konstituen; tanggal akhir ikut diunduh |
 | Threshold Spearman | 0.2 | Ambang batas korelasi rendah |
-| Maksimum Saham | 12 | Batas jumlah saham terpilih |
+| Maksimum Saham | 13 | Batas jumlah saham terpilih |
 | Dana Awal VaR | Rp 100.000.000 | Basis konversi VaR ke rupiah |
 
 ---
@@ -279,10 +281,7 @@ Default disetel untuk kasus penelitian skripsi, namun semua parameter dapat diub
 
 ### Log Return vs Simple Return
 
-Aplikasi menggunakan log return, bukan simple return, karena:
-1. Bersifat aditif antar periode
-2. Lebih stabil secara statistik
-3. Mendekati distribusi normal pada frekuensi tinggi
+Aplikasi menggunakan log return karena bersifat aditif antarperiode: jumlah log return harian sama dengan log return seluruh periode. Return portofolio dihitung sebagai jumlah tertimbang log return saham, yang merupakan pendekatan.
 
 ### Semivariance vs Variance
 
@@ -292,14 +291,19 @@ Matriks risiko yang digunakan adalah semivariance-semicovariance, bukan covarian
 
 Kedua strategi optimasi menerapkan long-only constraint melalui parameter bounds SLSQP. Tidak ada bobot negatif yang diizinkan, sehingga tidak ada skenario short-selling.
 
-### Multiple Random Starts
+### Titik Awal SLSQP
 
-Optimasi SLSQP dijalankan dengan 10 titik awal acak untuk mengurangi risiko terjebak di local optimum. Hasil terbaik (Sortino tertinggi atau Semivariance terendah) yang diambil.
+Optimasi SLSQP dijalankan dari 10 titik awal acak (benih 0 sampai 9) dan hasil terbaik yang diambil. Kedua fungsi tujuan tidak memiliki optimum lokal selain optimum global, sehingga kesepuluh titik awal berfungsi sebagai pemeriksaan bahwa solver memberi hasil yang sama. Bila tidak ada titik awal yang konvergen, aplikasi menampilkan peringatan dan bobot diisi sama rata.
+
+### Tanggal Akhir
+
+Yahoo Finance tidak menyertakan tanggal `end` yang diminta, sehingga aplikasi menggeser tanggal akhir satu hari saat mengunduh. Tanggal akhir yang diisi pengguna ikut dihitung.
 
 ### Guard Pencegahan Error
 
 - Validasi jumlah ticker minimal 2
 - Peringatan jika periode menghasilkan kurang dari 30 observasi
+- Peringatan jika SLSQP tidak konvergen dari semua titik awal
 - Peringatan otomatis jika ticker dan benchmark tidak cocok (misal ticker `.JK` dengan benchmark `^GSPC`)
 - Filter bobot di bawah 1e-6 dari pie chart untuk menghindari notasi ilmiah
 - Penanganan koneksi gagal ke Yahoo Finance dengan pesan yang jelas

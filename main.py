@@ -1,12 +1,4 @@
-"""
-Portofolio Optimizer — aplikasi Streamlit untuk optimasi portofolio.
-
-Aplikasi untuk analisis dan optimasi portofolio saham dengan pendekatan
-Mean-Semivariance. Menyediakan dua strategi optimasi berbasis SLSQP:
-memaksimalkan Sortino Ratio dan meminimalkan Semivariance.
-
-Bagian dari skripsi S1 Statistika Universitas Diponegoro.
-"""
+"""Aplikasi web Streamlit optimasi portofolio Mean-Semivariance dengan SLSQP (skripsi S1 Statistika Undip)."""
 
 import streamlit as st
 import pandas as pd
@@ -21,7 +13,6 @@ from functions import (
     THRESHOLD_KORELASI_DEFAULT,
     MAX_SAHAM_DEFAULT,
     DANA_AWAL_VAR_DEFAULT,
-    HARI_BURSA_SETAHUN,
     MIN_OBSERVASI,
     load_data_saham,
     load_data_benchmark,
@@ -31,10 +22,8 @@ from functions import (
     hitung_matriks_semivariance,
     optimasi_slsqp_max_sortino,
     optimasi_slsqp_min_semivariance,
-    hitung_sortino,
-    hitung_cumulative_return,
-    hitung_var_historical,
-    bandingkan_strategi,
+    hitung_metrik_strategi,
+    tabel_perbandingan,
     deteksi_ketidakcocokan_benchmark,
 )
 
@@ -58,17 +47,16 @@ PALETTE_PIE = [
     "#0F1E54", "#92400E",
 ]
 
+WARNA_STRATEGI = {"Max Sortino": "#1E3A8A", "Min Semivariance": "#D97706"}
+
 BOBOT_MINIMAL_TAMPIL = 1e-6
 
 BORDER_HAIRLINE = "1px solid rgba(128, 128, 128, 0.2)"
 BORDER_DASHED = "1px dashed rgba(128, 128, 128, 0.25)"
 
 
-def init_state():
-    """
-    Inisialisasi semua key session_state dengan nilai default.
-    Dipanggil sekali di awal main() agar konsisten di seluruh halaman.
-    """
+def init_state() -> None:
+    """Isi nilai awal session_state sekali per sesi."""
     defaults = {
         "data_saham": None,
         "data_benchmark": None,
@@ -83,8 +71,8 @@ def init_state():
         "matriks_sv": None,
         "bobot_max_sortino": None,
         "bobot_min_sv": None,
-        "sortino_max": None,
-        "perbandingan": None,
+        "metrik": None,
+        "solver_gagal": [],
         "config": {
             "tickers": DAFTAR_SAHAM_DEFAULT,
             "benchmark": BENCHMARK_DEFAULT,
@@ -100,14 +88,14 @@ def init_state():
             st.session_state[k] = v
 
 
-def require_data():
+def require_data() -> None:
     """Guard: pastikan data sudah dimuat sebelum lanjut render halaman."""
     if st.session_state.data_saham is None:
         st.info("Silakan muat data terlebih dahulu di halaman **Input Data**.")
         st.stop()
 
 
-def require_selection():
+def require_selection() -> None:
     """Guard: pastikan seleksi saham sudah dijalankan."""
     require_data()
     if not st.session_state.saham_terpilih:
@@ -118,7 +106,7 @@ def require_selection():
         st.stop()
 
 
-def require_optimization():
+def require_optimization() -> None:
     """Guard: pastikan optimasi sudah dijalankan sebelum halaman evaluasi."""
     require_selection()
     if st.session_state.bobot_max_sortino is None:
@@ -129,12 +117,8 @@ def require_optimization():
         st.stop()
 
 
-def hairline_header(title, metadata=""):
-    """
-    Header halaman dengan garis horizontal di atas dan bawah.
-    Warna teks inherit dari theme Streamlit; border pakai rgba mid-gray
-    agar tetap terlihat di light maupun dark mode.
-    """
+def hairline_header(title: str, metadata: str = "") -> None:
+    """Judul halaman dengan garis atas dan bawah serta metadata di kanan."""
     st.markdown(
         f"""
         <div style="display: flex; justify-content: space-between; align-items: baseline;
@@ -154,7 +138,7 @@ def hairline_header(title, metadata=""):
     )
 
 
-def section_title(text):
+def section_title(text: str) -> None:
     """Judul section dengan garis bawah tipis dan letter-spacing lebar."""
     st.markdown(
         f"""
@@ -171,15 +155,8 @@ def section_title(text):
     )
 
 
-def metric_card(label, value, accent="#1E3A8A", sublabel=None):
-    """
-    Kartu metrik untuk menampilkan satu nilai KPI.
-
-    Memakai custom HTML agar tampilan identik dengan versi lama (border
-    tipis dengan accent bar di kiri). Border pakai rgba mid-gray agar
-    tetap terlihat di dark mode. Warna aksen tetap hex karena distintif
-    di kedua tema.
-    """
+def metric_card(label: str, value: str, accent: str = "#1E3A8A", sublabel: str | None = None) -> None:
+    """Kartu satu nilai metrik dengan garis aksen di kiri."""
     sublabel_html = ""
     if sublabel:
         sublabel_html = (
@@ -207,14 +184,8 @@ def metric_card(label, value, accent="#1E3A8A", sublabel=None):
     )
 
 
-def info_box(text, kind="info"):
-    """
-    Kotak informasi dengan border kiri berwarna sesuai jenisnya.
-
-    Background memakai rgba semi-transparan agar blend dengan warna
-    background tema. Di light mode menghasilkan tint lembut di atas
-    putih; di dark mode menghasilkan tint gelap di atas hitam.
-    """
+def info_box(text: str, kind: str = "info") -> None:
+    """Kotak informasi berwarna sesuai jenisnya (info, success, warning, error)."""
     color_map = {
         "info":    ("#0369A1", "rgba(3, 105, 161, 0.12)"),
         "success": ("#047857", "rgba(4, 120, 87, 0.12)"),
@@ -235,7 +206,7 @@ def info_box(text, kind="info"):
     )
 
 
-def empty_state(message):
+def empty_state(message: str) -> None:
     """Tampilan saat tidak ada data untuk ditampilkan."""
     st.markdown(
         f"""
@@ -248,14 +219,8 @@ def empty_state(message):
     )
 
 
-def _pie_bobot(saham_list, bobot, warna_series):
-    """
-    Bangun pie chart bobot portofolio.
-
-    Bobot di bawah BOBOT_MINIMAL_TAMPIL difilter agar tidak muncul sebagai
-    notasi ilmiah (misal 2.49e-15%) di label. Saham tersebut tetap tampil
-    di tabel bobot dengan bobot 0.
-    """
+def _pie_bobot(saham_list: list[str], bobot: np.ndarray, warna_series: list[str]) -> go.Figure | None:
+    """Pie chart bobot; bobot di bawah BOBOT_MINIMAL_TAMPIL tidak digambar."""
     mask = bobot > BOBOT_MINIMAL_TAMPIL
     labels = [s for s, m in zip(saham_list, mask) if m]
     values = bobot[mask] * 100
@@ -283,12 +248,8 @@ def _pie_bobot(saham_list, bobot, warna_series):
     return fig
 
 
-def render_sidebar():
-    """
-    Sidebar dengan navigasi dan status data.
-    Icons memakai Material Symbols native Streamlit (prefix :material/nama:).
-    Return nama halaman bersih untuk routing.
-    """
+def render_sidebar() -> str:
+    """Sidebar navigasi dan status data; mengembalikan nama halaman terpilih."""
     with st.sidebar:
         st.markdown(
             """
@@ -374,7 +335,7 @@ def render_sidebar():
     return page
 
 
-def _sidebar_metadata():
+def _sidebar_metadata() -> str:
     """Metadata singkat yang muncul di kanan atas setiap halaman."""
     if st.session_state.data_saham is None:
         return "Belum ada data"
@@ -386,7 +347,7 @@ def _sidebar_metadata():
     return f"{n_saham} saham · {n_hari} hari · {bench}"
 
 
-def render_home():
+def render_home() -> None:
     """Halaman Home: penjelasan aplikasi, alur analisis, dan konfigurasi default."""
     hairline_header("Portofolio Optimizer", "By: Ridho Akbar Fadhilah")
 
@@ -431,10 +392,10 @@ def render_home():
 
     steps = [
         ("01", "Input Data", "Unduh harga historis dari Yahoo Finance dan hitung log return harian."),
-        ("02", "Eksplorasi Data", "Statistik deskriptif, distribusi return, dan matriks korelasi antar aset."),
+        ("02", "Eksplorasi Data", "Statistik deskriptif return harian dan pergerakan harga ternormalisasi."),
         ("03", "Seleksi Saham", "Filter E(R) > 0, lalu seleksi berdasarkan Spearman threshold."),
         ("04", "Optimasi", "SLSQP max Sortino Ratio dan SLSQP min Semivariance."),
-        ("05", "Evaluasi", "Sortino harian & tahunan, Cumulative Return, VaR 95% Historical."),
+        ("05", "Evaluasi", "Sortino Ratio harian, Cumulative Return, dan VaR 95% Simulasi Historis."),
         ("06", "Perbandingan", "Uji empiris: apakah max Sortino unggul dari min Semivariance?"),
     ]
 
@@ -501,11 +462,8 @@ def render_home():
     )
 
 
-def _parse_tickers(text):
-    """
-    Parse input ticker dari textarea.
-    Menerima pemisah enter atau koma; return list ticker unik uppercase.
-    """
+def _parse_tickers(text: str) -> list[str]:
+    """Pisahkan input ticker (baris baru atau koma) menjadi daftar unik huruf kapital."""
     tickers = []
     for line in text.replace(",", "\n").split("\n"):
         t = line.strip().upper()
@@ -514,16 +472,9 @@ def _parse_tickers(text):
     return tickers
 
 
-def _jalankan_pipeline(tickers, benchmark, start_date, end_date,
-                       threshold, max_saham, dana_awal):
-    """
-    Pipeline utama saat user klik "Muat Data & Jalankan Seleksi":
-    1. Unduh data saham dan benchmark dari Yahoo Finance
-    2. Selaraskan tanggal (intersection)
-    3. Hitung log return
-    4. Jalankan seleksi dua tahap
-    5. Simpan hasil ke session_state
-    """
+def _jalankan_pipeline(tickers: list[str], benchmark: str, start_date: str, end_date: str,
+                       threshold: float, max_saham: int, dana_awal: int) -> None:
+    """Unduh data, selaraskan tanggal, hitung log return, dan jalankan seleksi dua tahap."""
     if len(tickers) < 2:
         st.error("Minimal 2 ticker diperlukan untuk membentuk portofolio.")
         return
@@ -586,9 +537,9 @@ def _jalankan_pipeline(tickers, benchmark, start_date, end_date,
     })
 
     for key in ["matriks_sv", "returns_terpilih", "benchmark_aligned",
-                "mu_terpilih", "bobot_max_sortino", "bobot_min_sv",
-                "sortino_max", "perbandingan"]:
+                "mu_terpilih", "bobot_max_sortino", "bobot_min_sv", "metrik"]:
         st.session_state[key] = None
+    st.session_state.solver_gagal = []
 
     info_box(
         f"Data dimuat: <strong>{data_saham.shape[1]} saham</strong> · "
@@ -598,7 +549,7 @@ def _jalankan_pipeline(tickers, benchmark, start_date, end_date,
     )
 
 
-def render_input_data():
+def render_input_data() -> None:
     """Halaman input: ticker, benchmark, periode, dan parameter seleksi."""
     hairline_header("Input Data", _sidebar_metadata())
 
@@ -702,11 +653,8 @@ def render_input_data():
         )
 
 
-def render_eksplorasi():
-    """
-    Halaman eksplorasi: statistik deskriptif return, plot harga ternormalisasi
-    Base 100, dan heatmap korelasi return.
-    """
+def render_eksplorasi() -> None:
+    """Halaman Eksplorasi Data: statistik deskriptif return dan harga ternormalisasi."""
     require_data()
     hairline_header("Eksplorasi Data", _sidebar_metadata())
 
@@ -720,8 +668,6 @@ def render_eksplorasi():
         "Std Dev": log_return.std(),
         "Min": log_return.min(),
         "Max": log_return.max(),
-        "Skewness": log_return.skew(),
-        "Kurtosis": log_return.kurtosis(),
     })
     stat_desc = stat_desc.reset_index()
     stat_desc.columns = ["Ticker"] + list(stat_desc.columns[1:])
@@ -772,42 +718,9 @@ def render_eksplorasi():
     )
     st.plotly_chart(fig, width="stretch")
 
-    section_title("Heatmap Korelasi Return")
 
-    corr_matrix = log_return.corr()
-
-    fig_heat = go.Figure(data=go.Heatmap(
-        z=corr_matrix.values,
-        x=corr_matrix.columns.tolist(),
-        y=corr_matrix.index.tolist(),
-        colorscale=[
-            [0.0, "#1E3A8A"],
-            [0.5, "#FFFFFF"],
-            [1.0, "#B91C1C"],
-        ],
-        zmid=0,
-        zmin=-1,
-        zmax=1,
-        text=np.round(corr_matrix.values, 2),
-        texttemplate="%{text}",
-        textfont={"size": 9},
-        hovertemplate="Korelasi(%{x}, %{y}) = %{z:.3f}<extra></extra>",
-    ))
-
-    fig_heat.update_layout(
-        template="plotly_white",
-        height=max(400, 20 * len(corr_matrix.columns)),
-        xaxis=dict(tickfont=dict(size=10), side="bottom"),
-        yaxis=dict(tickfont=dict(size=10), autorange="reversed"),
-    )
-    st.plotly_chart(fig_heat, width="stretch")
-
-
-def render_seleksi():
-    """
-    Halaman seleksi saham: menampilkan hasil dua tahap seleksi
-    beserta heatmap korelasi Spearman.
-    """
+def render_seleksi() -> None:
+    """Halaman Seleksi Saham: hasil tahap 1, tahap 2, dan heatmap Spearman."""
     require_selection()
     hairline_header("Seleksi Saham", _sidebar_metadata())
 
@@ -829,10 +742,6 @@ def render_seleksi():
             "Ticker": hasil["saham_positif"],
             "Expected Return (harian)": [
                 f"{expected_return[t]:.6f}" for t in hasil["saham_positif"]
-            ],
-            "Expected Return (tahunan)": [
-                f"{(np.exp(expected_return[t] * HARI_BURSA_SETAHUN) - 1) * 100:.2f}%"
-                for t in hasil["saham_positif"]
             ],
         })
         st.dataframe(er_positif, hide_index=True, width="stretch")
@@ -898,9 +807,8 @@ def render_seleksi():
         expected_return = st.session_state.expected_return
         df_terpilih = pd.DataFrame({
             "Ticker": saham_terpilih,
-            "Expected Return (tahunan)": [
-                f"{(np.exp(expected_return[t] * HARI_BURSA_SETAHUN) - 1) * 100:.2f}%"
-                for t in saham_terpilih
+            "Expected Return (harian)": [
+                f"{expected_return[t]:.6f}" for t in saham_terpilih
             ],
         })
         st.dataframe(df_terpilih, hide_index=True, width="stretch")
@@ -908,35 +816,33 @@ def render_seleksi():
         empty_state("Tidak ada saham yang lolos seleksi.")
 
 
-def _jalankan_optimasi():
-    """
-    Jalankan dua optimasi SLSQP:
-    1. Max Sortino Ratio
-    2. Min Semivariance
-    Simpan hasil bobot dan Sortino optimal ke session_state.
-    """
+def _jalankan_optimasi() -> None:
+    """Jalankan kedua strategi SLSQP lalu simpan bobot dan metrik evaluasinya."""
     mu = st.session_state.mu_terpilih
     sigma_sv = st.session_state.matriks_sv
-    benchmark_mean = float(np.mean(st.session_state.benchmark_aligned))
+    benchmark = st.session_state.benchmark_aligned
 
     with st.spinner("Mengoptimasi portofolio dengan SLSQP..."):
-        bobot_max_sortino, sortino_max = optimasi_slsqp_max_sortino(
-            mu, sigma_sv, benchmark_mean, n_starts=10
-        )
-        bobot_min_sv = optimasi_slsqp_min_semivariance(
-            sigma_sv, n_starts=10
-        )
+        bobot_max, _, berhasil_max = optimasi_slsqp_max_sortino(mu, sigma_sv, float(np.mean(benchmark)))
+        bobot_min, berhasil_min = optimasi_slsqp_min_semivariance(sigma_sv)
 
-    st.session_state.bobot_max_sortino = bobot_max_sortino
-    st.session_state.bobot_min_sv = bobot_min_sv
-    st.session_state.sortino_max = sortino_max
+    st.session_state.bobot_max_sortino = bobot_max
+    st.session_state.bobot_min_sv = bobot_min
+    st.session_state.solver_gagal = [
+        nama for nama, berhasil in (("Max Sortino", berhasil_max), ("Min Semivariance", berhasil_min))
+        if not berhasil
+    ]
+
+    dana_awal = st.session_state.config["dana_awal"]
+    returns = st.session_state.returns_terpilih
+    st.session_state.metrik = {
+        nama: hitung_metrik_strategi(returns, bobot, mu, sigma_sv, benchmark, dana_awal)
+        for nama, bobot in (("Max Sortino", bobot_max), ("Min Semivariance", bobot_min))
+    }
 
 
-def render_optimasi():
-    """
-    Halaman optimasi: tombol jalankan, lalu tampilkan hasil kedua strategi
-    beserta pie chart dan tabel perbandingan bobot.
-    """
+def render_optimasi() -> None:
+    """Halaman Optimasi Portofolio: hitung matriks risiko lalu jalankan kedua strategi."""
     require_selection()
     hairline_header("Optimasi Portofolio", _sidebar_metadata())
 
@@ -975,17 +881,19 @@ def render_optimasi():
         _render_hasil_optimasi()
 
 
-def _render_hasil_optimasi():
-    """
-    Render hasil kedua strategi: tabel bobot + pie chart, tabel perbandingan,
-    lalu metric Sortino untuk masing-masing.
-    """
+def _render_hasil_optimasi() -> None:
+    """Tabel dan pie chart bobot kedua strategi."""
     saham_terpilih = st.session_state.saham_terpilih
     bobot_max = st.session_state.bobot_max_sortino
     bobot_min = st.session_state.bobot_min_sv
 
-    returns = st.session_state.returns_terpilih
-    benchmark = st.session_state.benchmark_aligned
+
+    if st.session_state.solver_gagal:
+        st.warning(
+            "SLSQP tidak konvergen dari semua titik awal untuk strategi "
+            f"{', '.join(st.session_state.solver_gagal)}. Bobot diisi sama rata "
+            "dan bukan hasil optimasi; periksa data sebelum memakai hasil ini."
+        )
 
     section_title("Portofolio Optimal — SLSQP Max Sortino")
 
@@ -1040,149 +948,58 @@ def _render_hasil_optimasi():
     })
     st.dataframe(df_compare, hide_index=True, width="stretch")
 
-    return_max = returns @ bobot_max
-    return_min = returns @ bobot_min
 
-    sortino_max_actual = hitung_sortino(return_max, benchmark)
-    sortino_min_actual = hitung_sortino(return_min, benchmark)
-
-    section_title("Sortino Ratio — Perbandingan")
-
-    col1, col2 = st.columns(2)
-    with col1:
+def _kartu_metrik(metrik: dict, warna: str) -> None:
+    """Tiga kartu metrik evaluasi untuk satu strategi."""
+    sortino, var = metrik["sortino"], metrik["var"]
+    kolom = st.columns(3)
+    with kolom[0]:
+        metric_card("Sortino Ratio Harian", f"{sortino['sortino_harian']:.4f}", accent=warna)
+    with kolom[1]:
+        metric_card("Cumulative Return", f"{metrik['cumulative_return'] * 100:.2f}%", accent=warna)
+    with kolom[2]:
         metric_card(
-            "Sortino Tahunan · Max Sortino",
-            f"{sortino_max_actual['sortino_tahunan']:.4f}",
-            accent="#1E3A8A",
-            sublabel=f"Sortino harian: {sortino_max_actual['sortino_harian']:.4f}",
-        )
-    with col2:
-        metric_card(
-            "Sortino Tahunan · Min Semivariance",
-            f"{sortino_min_actual['sortino_tahunan']:.4f}",
-            accent="#D97706",
-            sublabel=f"Sortino harian: {sortino_min_actual['sortino_harian']:.4f}",
+            "VaR 95% (1 hari)",
+            f"Rp {var['var_rupiah']:,.0f}",
+            accent=warna,
+            sublabel=f"Setara {var['var_persen']:.2f}% dari dana · k = {var['posisi_k']}",
         )
 
 
-def render_evaluasi():
-    """
-    Halaman evaluasi kinerja: metric cards untuk kedua strategi,
-    plot cumulative return, dan histogram return + VaR.
-    """
+def render_evaluasi() -> None:
+    """Halaman Evaluasi Kinerja: metrik kedua strategi, grafik Cumulative Return, dan distribusi return dengan VaR."""
     require_optimization()
     hairline_header("Evaluasi Kinerja", _sidebar_metadata())
 
-    returns = st.session_state.returns_terpilih
+    metrik = st.session_state.metrik
     benchmark = st.session_state.benchmark_aligned
-    bobot_max = st.session_state.bobot_max_sortino
-    bobot_min = st.session_state.bobot_min_sv
-    dana_awal = st.session_state.config["dana_awal"]
 
-    return_max = returns @ bobot_max
-    return_min = returns @ bobot_min
-
-    sortino_max = hitung_sortino(return_max, benchmark)
-    sortino_min = hitung_sortino(return_min, benchmark)
-    cumret_max = hitung_cumulative_return(return_max)
-    cumret_min = hitung_cumulative_return(return_min)
-    var_max = hitung_var_historical(return_max, alpha=0.05, dana_awal=dana_awal)
-    var_min = hitung_var_historical(return_min, alpha=0.05, dana_awal=dana_awal)
-
-    section_title("Metrik Kinerja — Max Sortino")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        metric_card(
-            "Return Tahunan",
-            f"{sortino_max['return_tahunan'] * 100:.2f}%",
-            accent="#1E3A8A",
-        )
-    with col2:
-        metric_card(
-            "Sortino Tahunan",
-            f"{sortino_max['sortino_tahunan']:.4f}",
-            accent="#1E3A8A",
-        )
-    with col3:
-        metric_card(
-            "Cumulative Return",
-            f"{cumret_max * 100:.2f}%",
-            accent="#1E3A8A",
-        )
-    with col4:
-        metric_card(
-            "VaR 95% (1 hari)",
-            f"Rp {var_max['var_rupiah']:,.0f}",
-            accent="#1E3A8A",
-            sublabel=f"Setara {var_max['var_persen']:.2f}% dari dana",
-        )
-
-    section_title("Metrik Kinerja — Min Semivariance")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        metric_card(
-            "Return Tahunan",
-            f"{sortino_min['return_tahunan'] * 100:.2f}%",
-            accent="#D97706",
-        )
-    with col2:
-        metric_card(
-            "Sortino Tahunan",
-            f"{sortino_min['sortino_tahunan']:.4f}",
-            accent="#D97706",
-        )
-    with col3:
-        metric_card(
-            "Cumulative Return",
-            f"{cumret_min * 100:.2f}%",
-            accent="#D97706",
-        )
-    with col4:
-        metric_card(
-            "VaR 95% (1 hari)",
-            f"Rp {var_min['var_rupiah']:,.0f}",
-            accent="#D97706",
-            sublabel=f"Setara {var_min['var_persen']:.2f}% dari dana",
-        )
-
-    if var_max.get("pesan"):
-        info_box(var_max["pesan"], kind="warning")
+    for nama, warna in WARNA_STRATEGI.items():
+        section_title(f"Metrik Kinerja — {nama}")
+        _kartu_metrik(metrik[nama], warna)
+        if metrik[nama]["var"]["pesan"]:
+            info_box(metrik[nama]["var"]["pesan"], kind="warning")
 
     section_title("Cumulative Return")
 
-    idx = st.session_state.log_return.index[:len(return_max)]
-
-    cum_max = np.exp(pd.Series(return_max, index=idx).cumsum()) - 1
-    cum_min = np.exp(pd.Series(return_min, index=idx).cumsum()) - 1
-    cum_bench = np.exp(pd.Series(benchmark, index=idx).cumsum()) - 1
+    idx = st.session_state.log_return.index
+    seri = {nama: metrik[nama]["return_portofolio"] for nama in WARNA_STRATEGI}
+    seri["Benchmark"] = benchmark
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=cum_max.index,
-        y=cum_max * 100,
-        mode="lines",
-        name="Max Sortino",
-        line=dict(color="#1E3A8A", width=2),
-    ))
-    fig.add_trace(go.Scatter(
-        x=cum_min.index,
-        y=cum_min * 100,
-        mode="lines",
-        name="Min Semivariance",
-        line=dict(color="#D97706", width=2),
-    ))
-    fig.add_trace(go.Scatter(
-        x=cum_bench.index,
-        y=cum_bench * 100,
-        mode="lines",
-        name="Benchmark",
-        line=dict(color="#475569", width=1.5, dash="dash"),
-    ))
-
+    for nama, nilai in seri.items():
+        kumulatif = np.exp(pd.Series(nilai, index=idx).cumsum()) - 1
+        fig.add_trace(go.Scatter(
+            x=kumulatif.index,
+            y=kumulatif * 100,
+            mode="lines",
+            name=nama,
+            line=dict(
+                color=WARNA_STRATEGI.get(nama, "#475569"),
+                width=2 if nama in WARNA_STRATEGI else 1.5,
+                dash=None if nama in WARNA_STRATEGI else "dash",
+            ),
+        ))
     fig.update_layout(
         template="plotly_white",
         height=420,
@@ -1197,31 +1014,23 @@ def render_evaluasi():
 
     pilihan = st.selectbox(
         "Pilih strategi untuk distribusi return:",
-        options=["Max Sortino", "Min Semivariance"],
+        options=list(WARNA_STRATEGI),
         key="evaluasi_strategi",
     )
-
-    if pilihan == "Max Sortino":
-        return_plot = return_max
-        var_plot = var_max
-        warna = "#1E3A8A"
-    else:
-        return_plot = return_min
-        var_plot = var_min
-        warna = "#D97706"
+    return_plot = metrik[pilihan]["return_portofolio"]
+    var_plot = metrik[pilihan]["var"]
 
     fig_hist = go.Figure()
     fig_hist.add_trace(go.Histogram(
         x=return_plot * 100,
         nbinsx=40,
-        marker=dict(color=warna, opacity=0.75),
+        marker=dict(color=WARNA_STRATEGI[pilihan], opacity=0.75),
         name="Return Harian",
     ))
-
     fig_hist.add_vline(
         x=var_plot["q_alpha"] * 100,
         line=dict(color="#92400E", width=2, dash="dash"),
-        annotation_text=f"VaR 95% = {var_plot['q_alpha'] * 100:.2f}%",
+        annotation_text=f"Return ke-{var_plot['posisi_k']} = {var_plot['q_alpha'] * 100:.2f}%",
         annotation_position="top left",
         annotation_font=dict(size=11, color="#92400E"),
     )
@@ -1232,7 +1041,6 @@ def render_evaluasi():
         annotation_position="top right",
         annotation_font=dict(size=11, color="#475569"),
     )
-
     fig_hist.update_layout(
         template="plotly_white",
         height=380,
@@ -1243,24 +1051,21 @@ def render_evaluasi():
     st.plotly_chart(fig_hist, width="stretch")
 
 
-def render_perbandingan():
-    """
-    Halaman perbandingan strategi: tabel metrik, plot cumulative return,
-    dan narasi otomatis hasil perbandingan.
-    """
+def _kalimat_unggul(label: str, nilai_max: float, nilai_min: float, format_nilai, lebih_kecil_lebih_baik: bool = False) -> str:
+    """Satu kalimat narasi yang menyebut strategi dengan nilai lebih baik pada satu metrik."""
+    max_unggul = nilai_max < nilai_min if lebih_kecil_lebih_baik else nilai_max > nilai_min
+    unggul, kalah = ("Max Sortino", "Min Semivariance") if max_unggul else ("Min Semivariance", "Max Sortino")
+    nilai_unggul, nilai_kalah = (nilai_max, nilai_min) if max_unggul else (nilai_min, nilai_max)
+    return f"{label} {unggul} lebih baik ({format_nilai(nilai_unggul)} vs {format_nilai(nilai_kalah)} pada {kalah})."
+
+
+def render_perbandingan() -> None:
+    """Halaman Perbandingan Strategi: tabel metrik dan narasi hasil."""
     require_optimization()
     hairline_header("Perbandingan Strategi", _sidebar_metadata())
 
-    returns = st.session_state.returns_terpilih
-    benchmark = st.session_state.benchmark_aligned
-    bobot_max = st.session_state.bobot_max_sortino
-    bobot_min = st.session_state.bobot_min_sv
-
-    if st.session_state.perbandingan is None:
-        perbandingan = bandingkan_strategi(
-            returns, bobot_max, bobot_min, benchmark,
-        )
-        st.session_state.perbandingan = perbandingan
+    metrik_max = st.session_state.metrik["Max Sortino"]
+    metrik_min = st.session_state.metrik["Min Semivariance"]
 
     info_box(
         "Kedua strategi dioptimasi menggunakan matriks risiko yang sama, yaitu "
@@ -1270,110 +1075,43 @@ def render_perbandingan():
     )
 
     section_title("Tabel Perbandingan")
-
-    st.dataframe(
-        st.session_state.perbandingan,
-        hide_index=True,
-        width="stretch",
-    )
-
-    section_title("Cumulative Return")
-
-    return_max = returns @ bobot_max
-    return_min = returns @ bobot_min
-
-    idx = st.session_state.log_return.index[:len(return_max)]
-    cum_max = np.exp(pd.Series(return_max, index=idx).cumsum()) - 1
-    cum_min = np.exp(pd.Series(return_min, index=idx).cumsum()) - 1
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=cum_max.index,
-        y=cum_max * 100,
-        mode="lines",
-        name="Max Sortino",
-        line=dict(color="#1E3A8A", width=2),
-    ))
-    fig.add_trace(go.Scatter(
-        x=cum_min.index,
-        y=cum_min * 100,
-        mode="lines",
-        name="Min Semivariance",
-        line=dict(color="#D97706", width=2),
-    ))
-
-    fig.update_layout(
-        template="plotly_white",
-        height=400,
-        xaxis_title="",
-        yaxis_title="Cumulative Return (%)",
-        hovermode="closest",
-    )
-    st.plotly_chart(fig, width="stretch")
+    st.dataframe(tabel_perbandingan(metrik_max, metrik_min), hide_index=True, width="stretch")
 
     section_title("Narasi Hasil")
 
-    sortino_max_val = hitung_sortino(return_max, benchmark)
-    sortino_min_val = hitung_sortino(return_min, benchmark)
-    var_max_val = hitung_var_historical(return_max)
-    var_min_val = hitung_var_historical(return_min)
-    cumret_max_val = hitung_cumulative_return(return_max)
-    cumret_min_val = hitung_cumulative_return(return_min)
-
-    parts = []
-
-    if sortino_max_val["sortino_tahunan"] > sortino_min_val["sortino_tahunan"]:
-        parts.append(
-            f"<strong>SLSQP max Sortino unggul dalam risk-adjusted return</strong> "
-            f"(Sortino tahunan {sortino_max_val['sortino_tahunan']:.4f} vs "
-            f"{sortino_min_val['sortino_tahunan']:.4f})."
-        )
-    else:
-        parts.append(
-            f"SLSQP min Semivariance menghasilkan Sortino tahunan lebih tinggi "
-            f"({sortino_min_val['sortino_tahunan']:.4f} vs "
-            f"{sortino_max_val['sortino_tahunan']:.4f}), meskipun tujuannya "
-            f"bukan memaksimalkan Sortino."
-        )
-
-    if cumret_max_val > cumret_min_val:
-        parts.append(
-            f"Cumulative return max Sortino lebih tinggi "
-            f"({cumret_max_val * 100:.2f}% vs {cumret_min_val * 100:.2f}%)."
-        )
-    else:
-        parts.append(
-            f"Cumulative return min Semivariance lebih tinggi "
-            f"({cumret_min_val * 100:.2f}% vs {cumret_max_val * 100:.2f}%)."
-        )
-
-    if var_max_val["var_rupiah"] < var_min_val["var_rupiah"]:
-        parts.append(
-            f"Risiko downside max Sortino lebih kecil "
-            f"(VaR Rp {var_max_val['var_rupiah']:,.0f} vs "
-            f"Rp {var_min_val['var_rupiah']:,.0f})."
-        )
-    else:
-        parts.append(
-            f"Risiko downside min Semivariance lebih kecil "
-            f"(VaR Rp {var_min_val['var_rupiah']:,.0f} vs "
-            f"Rp {var_max_val['var_rupiah']:,.0f})."
-        )
+    kalimat = [
+        _kalimat_unggul(
+            "Sortino Ratio harian",
+            metrik_max["sortino"]["sortino_harian"], metrik_min["sortino"]["sortino_harian"],
+            lambda x: f"{x:.4f}",
+        ),
+        _kalimat_unggul(
+            "Cumulative Return",
+            metrik_max["cumulative_return"], metrik_min["cumulative_return"],
+            lambda x: f"{x * 100:.2f}%",
+        ),
+        _kalimat_unggul(
+            "VaR 95%",
+            metrik_max["var"]["var_rupiah"], metrik_min["var"]["var_rupiah"],
+            lambda x: f"Rp {x:,.0f}",
+            lebih_kecil_lebih_baik=True,
+        ),
+    ]
 
     st.markdown(
         f"""
         <div style="border: {BORDER_HAIRLINE};
                     border-radius: 8px; padding: 20px 24px;
                     font-size: 0.88rem; line-height: 1.75;">
-            {' '.join(parts)}
+            {' '.join(kalimat)}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def main():
-    """Entry point: init state, render sidebar, route ke halaman yang dipilih."""
+def main() -> None:
+    """Inisialisasi state, tampilkan sidebar, lalu buka halaman yang dipilih."""
     init_state()
     page = render_sidebar()
 
