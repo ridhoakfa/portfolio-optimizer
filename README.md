@@ -371,7 +371,7 @@ Kedua strategi optimasi menerapkan long-only constraint melalui parameter bounds
 
 ### Titik Awal SLSQP
 
-Optimasi SLSQP dijalankan dari 10 titik awal acak (benih 0 sampai 9) dan hasil terbaik yang diambil. Kedua fungsi tujuan tidak memiliki optimum lokal selain optimum global, sehingga kesepuluh titik awal berfungsi sebagai pemeriksaan bahwa solver memberi hasil yang sama. Bila tidak ada titik awal yang konvergen, aplikasi menampilkan peringatan dan bobot diisi sama rata.
+Optimasi SLSQP dijalankan dari 10 titik awal acak (benih 0 sampai 9), dan dipakai hasil dengan nilai fungsi tujuan terbaik. Bila tidak ada titik awal yang konvergen, aplikasi menampilkan peringatan dan bobot diisi sama rata.
 
 ### Tanggal Akhir
 
