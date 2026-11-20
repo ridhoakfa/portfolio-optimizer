@@ -288,28 +288,6 @@ def hitung_metrik_strategi(
     }
 
 
-def tabel_perbandingan(metrik_max: dict, metrik_min: dict) -> pd.DataFrame:
-    """Tabel perbandingan kedua strategi untuk halaman Perbandingan Strategi."""
-    def kolom(m: dict) -> list[str]:
-        return [
-            f"{m['sortino']['sortino_harian']:.4f}",
-            f"{m['sortino']['semideviation'] * 100:.4f}%",
-            f"{m['cumulative_return'] * 100:.2f}%",
-            f"Rp {m['var']['var_rupiah']:,.0f}",
-        ]
-
-    return pd.DataFrame({
-        "Metrik": [
-            "Sortino Ratio Harian",
-            "Semideviation Harian",
-            "Cumulative Return",
-            "VaR 95% 1 hari (Rp)",
-        ],
-        "Max Sortino": kolom(metrik_max),
-        "Min Semivariance": kolom(metrik_min),
-    })
-
-
 def deteksi_ketidakcocokan_benchmark(tickers: list[str], benchmark: str) -> str | None:
     """Pesan peringatan bila mayoritas ticker dan benchmark berasal dari pasar berbeda."""
     if not tickers:
