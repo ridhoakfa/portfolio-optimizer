@@ -4,7 +4,7 @@ Aplikasi web untuk analisis dan optimasi portofolio saham menggunakan pendekatan
 
 Dikembangkan sebagai bagian dari skripsi S1 Program Studi Statistika, Universitas Diponegoro.
 
-**Aplikasi daring:** [portfolio-optimizer-akfa.streamlit.app](https://portfolio-optimizer-akfa.streamlit.app/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://portfolio-optimizer-akfa.streamlit.app/)
 
 ---
 
@@ -232,7 +232,7 @@ Proses ini akan mengunduh library Streamlit, pandas, numpy, scipy, yfinance, dan
 
 ## Menjalankan Aplikasi
 
-Aplikasi dapat langsung dipakai tanpa instalasi di [portfolio-optimizer-akfa.streamlit.app](https://portfolio-optimizer-akfa.streamlit.app/). Bila aplikasi sedang tidak aktif, Streamlit Community Cloud menampilkan tombol untuk membangunkannya; tunggu beberapa detik sampai halaman Beranda muncul.
+Aplikasi dapat langsung dipakai tanpa instalasi di [portfolio-optimizer-akfa.streamlit.app](https://portfolio-optimizer-akfa.streamlit.app/).
 
 Untuk menjalankan di komputer sendiri, setelah virtual environment aktif dan dependensi terpasang:
 
