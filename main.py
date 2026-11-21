@@ -1467,7 +1467,7 @@ def _tab_optimasi() -> None:
 
     st.markdown(
         f"Kedua masalah diselesaikan dengan SLSQP dari {JUMLAH_TITIK_AWAL} titik awal acak "
-        f"(benih 0 sampai {JUMLAH_TITIK_AWAL - 1}), maxiter 1000, dan ftol 10⁻⁹. "
+        f"(benih 0 sampai {JUMLAH_TITIK_AWAL - 1}), maxiter 1000, dan ftol 10⁻¹⁵. "
         "Bobot yang dipakai berasal dari titik awal dengan nilai fungsi tujuan terbaik."
     )
 

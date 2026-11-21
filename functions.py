@@ -189,7 +189,7 @@ def _optimasi_slsqp(fungsi_tujuan, n_aset: int) -> tuple[np.ndarray, bool]:
             method="SLSQP",
             bounds=batas,
             constraints=kendala,
-            options={"maxiter": 1000, "ftol": 1e-9},
+            options={"maxiter": 1000, "ftol": 1e-15},
         )
         if hasil.success and hasil.fun < nilai_terbaik:
             bobot_terbaik, nilai_terbaik = hasil.x, hasil.fun
